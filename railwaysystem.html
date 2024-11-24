@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Railway Platform Management</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: url('railway.jpg') no-repeat center center fixed;
+            background-size: cover;
+            color: white;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+            display: inline-block;
+            width: 100%;
+            max-width: 70%;
+        }
+
+        h1 {
+            font-size: 2em;
+            margin-bottom: 20px;
+            color: #ffcc00;
+            text-align: center;
+        }
+
+        .controls button, .controls select, .controls input {
+            background: #4CAF50;
+            color: white;
+            padding: 8px 15px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+
+        .controls button:hover {
+            background: #45a049;
+        }
+
+        .status {
+            margin-top: 20px;
+            text-align: left;
+        }
+
+        .input {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .input label {
+            font-size: 1.2em;
+            margin-bottom: 5px;
+        }
+
+        .input input, .input select {
+            padding: 8px;
+            font-size: 1em;
+            margin-top: 10px;
+            width: 80%;
+            margin-bottom: 15px;
+        }
+
+        table {
+            width: 100%;
+            margin-top: 20px;
+            color: white;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #4CAF50;
+        }
+
+        .reset-btn {
+            background-color: #f44336;
+            margin-top: 10px;
+        }
+
+        .reset-btn:hover {
+            background-color: #e53935;
+        }
+    </style>
+    <script>
+        // Priority Queue to manage train arrivals
+        class PriorityQueue {
+            constructor() {
+                this.queue = [];
+            }
+
+            enqueue(train) {
+                let added = false;
+                for (let i = 0; i < this.queue.length; i++) {
+                    if (train.scheduledArrival < this.queue[i].scheduledArrival) {
+                        this.queue.splice(i, 0, train);
+                        added = true;
+                        break;
+                    }
+                }
+                if (!added) {
+                    this.queue.push(train);
+                }
+            }
+
+            dequeue() {
+                return this.queue.shift();
+            }
+
+            peek() {
+                return this.queue[0];
+            }
+
+            isEmpty() {
+                return this.queue.length === 0;
+            }
+
+            size() {
+                return this.queue.length;
+            }
+
+            removeTrain(trainNumber) {
+                const index = this.queue.findIndex(t => t.trainNumber === trainNumber);
+                if (index !== -1) {
+                    this.queue.splice(index, 1);
+                }
+            }
+        }
+
+        // Platform management and trains tracking
+        const platforms = [
+            { id: 1, trains: new PriorityQueue() },
+            { id: 2, trains: new PriorityQueue() },
+            { id: 3, trains: new PriorityQueue() }
+        ];
+
+        function resetPage() {
+            // Reset all data for the new day
+            platforms.forEach(platform => platform.trains = new PriorityQueue());
+            showPlatformStatus();
+            resetInputs();
+        }
+
+        function resetInputs() {
+            document.getElementById('train-number').value = '';
+            document.getElementById('arrival-time').value = '';
+            document.getElementById('departure-time').value = '';
+            document.getElementById('platform-number').value = '1';
+        }
+
+        function arrive() {
+            const trainNumber = document.getElementById('train-number').value;
+            const platformNumber = parseInt(document.getElementById('platform-number').value);
+            const scheduledArrival = new Date(document.getElementById('arrival-time').value);
+            const scheduledDeparture = new Date(document.getElementById('departure-time').value);
+            const currentTime = new Date();
+
+            if (trainNumber && scheduledArrival && scheduledDeparture) {
+                const selectedPlatform = platforms.find(p => p.id === platformNumber);
+                if (selectedPlatform) {
+                    selectedPlatform.trains.enqueue({
+                        trainNumber: trainNumber,
+                        scheduledArrival: scheduledArrival,
+                        actualArrival: currentTime,
+                        scheduledDeparture: scheduledDeparture,
+                        actualDeparture: null,  // Departure time is initially null
+                        delay: (currentTime - scheduledArrival) > 0 // Arrival delay
+                    });
+                    showPlatformStatus(); // Display information first
+                    resetInputs(); // Then reset input boxes
+                } else {
+                    alert("Invalid platform number.");
+                }
+            } else {
+                alert('Please enter a train number, scheduled arrival and departure times.');
+            }
+        }
+
+        function depart(platformNumber) {
+            const selectedPlatform = platforms.find(p => p.id === platformNumber);
+
+            if (selectedPlatform && !selectedPlatform.trains.isEmpty()) {
+                const train = selectedPlatform.trains.peek(); // Get the first train in the queue
+                train.actualDeparture = new Date();  // Set the actual departure time
+
+                // Remove the train from the platform queue after departure
+                selectedPlatform.trains.dequeue(); 
+
+                // Display updated information
+                showPlatformStatus();
+            } else {
+                alert(`No trains at platform ${platformNumber} to depart.`);
+            }
+
+            resetInputs(); // Reset input boxes after departure
+        }
+
+        function showPlatformStatus() {
+            const statusContainer = document.getElementById('platform-status');
+            statusContainer.innerHTML = '';
+
+            platforms.forEach(platform => {
+                let platformStatus = `<h3>Platform ${platform.id}</h3><table>
+                    <tr>
+                        <th>Train Number</th>
+                        <th>Scheduled Arrival</th>
+                        <th>Actual Arrival</th>
+                        <th>Scheduled Departure</th>
+                        <th>Delay</th>
+                    </tr>`;
+
+                platform.trains.queue.forEach(train => {
+                    const scheduledArrival = train.scheduledArrival.toLocaleTimeString('en-GB');
+                    const actualArrival = train.actualArrival.toLocaleTimeString('en-GB');
+                    const scheduledDeparture = train.scheduledDeparture ? train.scheduledDeparture.toLocaleTimeString('en-GB') : 'N/A';
+                    const delayStatus = train.delay ? 'Yes' : 'No';
+
+                    platformStatus += ` 
+                        <tr>
+                            <td>${train.trainNumber}</td>
+                            <td>${scheduledArrival}</td>
+                            <td>${actualArrival}</td>
+                            <td>${scheduledDeparture}</td>
+                            <td>${delayStatus}</td>
+                        </tr>`;
+                });
+
+                platformStatus += '</table>';
+                statusContainer.innerHTML += platformStatus;
+            });
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>Railway Platform Management</h1>
+        <div class="input">
+            <label for="train-number">Enter train number:</label>
+            <input type="text" id="train-number" placeholder="Train Number">
+            <label for="arrival-time">Scheduled Arrival Time:</label>
+            <input type="datetime-local" id="arrival-time">
+            <label for="departure-time">Scheduled Departure Time:</label>
+            <input type="datetime-local" id="departure-time">
+            <label for="platform-number">Select platform number:</label>
+            <select id="platform-number">
+                <option value="1">Platform 1</option>
+                <option value="2">Platform 2</option>
+                <option value="3">Platform 3</option>
+            </select>
+        </div>
+        <div class="controls">
+            <button onclick="arrive()">Train Arrival</button>
+            <button onclick="depart(1)">Train Departure (Platform 1)</button>
+            <button onclick="depart(2)">Train Departure (Platform 2)</button>
+            <button onclick="depart(3)">Train Departure (Platform 3)</button>
+            <button class="reset-btn" onclick="resetPage()">Reset for New Day</button>
+        </div>
+        <div id="platform-status" class="status"></div>
+    </div>
+</body>
+</html>
